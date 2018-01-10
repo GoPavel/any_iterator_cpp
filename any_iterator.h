@@ -5,127 +5,304 @@
 #include <iterator>
 #include <cassert>
 
+// Iterator must be
+/*
+ * CopyConctructible
+ * CopyAssignable
+ * lvalue swappable
+ */
+
+class bad_any_iterator: public std::exception {
+public:
+    char const* message;
+
+    bad_any_iterator(const char *msg) : message(msg) { }
+
+    const char *what() const noexcept override {
+        return "bad_any_iterator";
+    }
+};
+
 template <typename T, typename iterator_categories_tag>
 class any_iterator;
 
 template<typename T>
 class any_iterator<T, std::forward_iterator_tag> {
-    typedef  std::forward_iterator_tag iterator_category;
+    typedef std::forward_iterator_tag iterator_category;
     typedef T value_type;
     typedef T* pointer;
     typedef T& reference;
 
     static const int SIZE = 16;
-    static const int ALLIGN = 8;
-    using storage_t = typename std::aligned_storage<SIZE, ALLIGN>::type;
+    static const int ALIGN = 8;
+    using storage_type = typename std::aligned_storage<SIZE, ALIGN>::type;
 
     storage_type storage;
 
-    struct meta_information_t {
-        size_t align;
-        bool is_nothrow_move;
-        using dereference_t = reference (*)();
-        dereference_t dereference;
-
-        using inc_t = reference (*)();
-        inc_t inc;
-        void (*destroy)(storage_t &);
-        void (*move)(storage_t &, storage_t &);
-        constexpr meta_information_t(size_t align,
-                                     bool is_nothrow_move,
-                                     dereference_t dereference,
-                                     inc_t inc)
-            : align(align),
-              is_nothrow_move(is_nothrow_move),
-              dereference(dereference),
-              inc(inc){ } //TODO
-
-        constexpr meta_information_t()
-            : align(8),
-              is_nothrow_move(true) { } //TODO
-    }* meta_information;
-
-    static constexpr bool is_small_type() {
-        return     (sizeof(T) <= SIZE)
-                && (meta_information->align <= ALLIGN)
-                && (meta_information->is_nothrow_move);
-    }
-
-    template<typename Some_iterator>
-    static constexpr meta_information_t* init_meta_information() {
-        static meta_information_t meta_information_instance  =
-                ((sizeof(T) <= SIZE) && (alignof(Some_iterator) <= ALLIGN) && (std::is_nothrow_move_constructible<Some_iterator>()) ?
-                   meta_information_t(
-                         alignof(Some_iterator),
-                         std::is_nothrow_move_constructible<Some_iterator>(),
-                         get_dereference_small<T, Some_iterator>,
-                         get_inc_small<T, Some_iterator>) :
-                   meta_information_t(
-                         alignof(Some_iterator),
-                         std::is_nothrow_move_constructible<Some_iterator>(),
-                         get_dereference_big<T, Some_iterator>,
-                         get_inc_big<T, Some_iterator>)
-                     );
-        return meta_information_instance;
-    } //TODO
-
-    template<typename T, typename Some_iterator>
-    static constexpr T& get_dereference_small() {
-        return *(reinterpret_cast<Some_iterator&>(storage));
-    }
-
-    template<typename T, typename Some_iterator>
-    static constexpr T& get_dereference_big() {
-        return *(*(reinterpret_cast<Some_iterator*>(storage)));
-    }
-
-    template<typename T, typename Some_iterator>
-    static constexpr T& get_inc_small() {
-        return ++(reinterpret_cast<Some_iterator&>(storage));
-    }
-
-    template<typename T, typename Some_iterator>
-    static constexpr T& get_inc_big() {
-        return ++(*(reinterpret_cast<Some_iterator*>(storage)));
-    }
-
+    struct meta_information_type;
+    meta_information_type const* ops;
 
 public: ///method
     any_iterator() noexcept
-        : meta_information() { }
+        : ops(meta_information_type::init_empty()) { }
 
     template <
-            typename Some_iterator,
-            typename std::enable_if_t<
+            typename Iter,
+            typename = std::enable_if_t<
                 std::is_base_of<
                     iterator_category,
-                    typename std::iterator_traits<Some_iterator>::iterator_category
+                    typename std::iterator_traits<Iter>::iterator_category
                     >::value
                 >
             >
-    any_iterator(Some_iterator const& other)
-        : meta_information(init_meta_information<T, Some_iterator>()) {
-        //TODO
+    any_iterator(Iter const& other)
+        : ops(meta_information_type::template init<Iter>()) {
+        if(ops->is_small) {
+            new (&storage) Iter(other);
+        } else {
+            reinterpret_cast<Iter*&>(storage) = new Iter(other);
+        }
     }
 
-    T& operator*() {
-        return meta_information->dereference(storage);
+    template <
+            typename Iter,
+            typename = std::enable_if_t<
+                std::is_base_of<
+                    iterator_category,
+                    typename std::iterator_traits<Iter>::iterator_category
+                    >::value
+                >
+            >
+    any_iterator(Iter &&other)
+        : ops(meta_information_type::template init<Iter>()) {
+        if (ops->is_small) {
+            new (&storage) Iter(std::move(other));
+        } else {
+            reinterpret_cast<Iter*&>(storage) = new Iter(std::move(other));
+        }
     }
 
-    T& operator++() {
-        return meta_information->inc();
+    any_iterator(any_iterator const& other): ops(other.ops) {
+        ops->copy(other.storage, storage);
     }
 
-    T operator++(int) {
-
+    any_iterator(any_iterator &&other): ops(other.ops) {
+        ops->move(other.storage, storage);
     }
 
-    //operator=
-    //operator++ pre and post
-    //operator*()
-    //operator->
-    //operator==
-    //operator!=
-}
+    any_iterator& operator= (any_iterator const& other) {
+        if ((*this) != other) {
+            ops->destroy(storage);
+            ops = other.ops;
+            ops->copy(other.storage, storage);
+        }
+        return *this;
+    }
 
+    any_iterator& operator= (any_iterator && other) {
+        if ((*this) != other) {
+            ops->destroy(storage);
+            ops = other.ops;
+            ops->move(other.storage, storage);
+        }
+        return *this;
+    }
+
+    ~any_iterator() {
+        ops->destroy(storage);
+    }
+
+    T& operator*() const {
+        return ops->dereference(storage);
+    }
+
+    bool constexpr empty() const noexcept {
+        return ops->is_empty;
+    }
+
+    any_iterator operator++() {
+        ops->inc(storage);
+        return *this;
+    }
+
+    any_iterator operator++(int) {
+        any_iterator temp(*this);
+        ops->inc(storage);
+        return temp;
+    }
+
+    T* operator-> () {
+        return &ops->dereference(storage);
+    }
+
+    friend bool operator== (any_iterator const &a, any_iterator const &b) {
+        if (a.ops == b.ops) {
+            return a.ops->eq(a.storage, b.storage);
+        } else
+            return false;
+    }
+
+    friend bool operator!= (any_iterator const &a, any_iterator const &b) {
+        return !(a == b);
+    }
+
+    friend void swap(any_iterator &a, any_iterator &b) {
+        storage_type buf_a, buf_b;
+        a.ops->move(a.storage, buf_a);
+        b.ops->move(b.storage, buf_b);
+        b.ops->move(buf_b, a.storage);
+        a.ops->move(buf_a, b.storage);
+        std::swap(a.ops, b.ops);
+    }
+};
+
+template <typename T>
+struct any_iterator<T, std::forward_iterator_tag>::meta_information_type {
+public:
+    bool is_empty;
+    bool is_small;
+    using dereference_type = T& (*)(storage_type const &);
+    dereference_type dereference;
+
+    using inc_type = void (*)(storage_type &);
+    inc_type inc;
+
+    using destroy_type = void (*)(storage_type &);
+    destroy_type destroy;
+
+    using copy_constr_type = void (*)(storage_type const&, storage_type &);
+    copy_constr_type copy_constr;
+
+    using copy_assign_type = void (*)(storage_type const&, storage_type &);
+    copy_assign_type copy_assign;
+
+    using move_constr_type = void(*)(storage_type &, storage_type &);
+    move_constr_type move_constr;
+
+    using move_assign_type = void(*)(storage_type &, storage_type &);
+    move_assign_type move_assign;
+
+    using eq_type = bool(*)(storage_type const &, storage_type const &);
+    eq_type eq;
+
+    constexpr meta_information_type(bool is_small,
+                                 copy_constr_type copy_constr,
+                                 copy_assign_type copy_assign,
+                                 move_constr_type move_constr,
+                                 move_assign_type move_assign,
+                                 dereference_type dereference,
+                                 inc_type inc,
+                                 destroy_type destroy,
+                                 eq_type eq)
+        : is_empty(false),
+          is_small(is_small),
+          dereference(dereference),
+          inc(inc),
+          destroy(destroy),
+          copy(copy),
+          move(move),
+          eq(eq)
+    { }
+
+    constexpr meta_information_type()
+        : is_empty(true),
+          is_small(true),
+          dereference(dereference_empty),
+          inc(inc_empty),
+          destroy(destroy_empty),
+          copy(copy_empty),
+          move(move_empty),
+          eq(eq_empty)
+    { }
+
+    template<typename Iter>
+    static meta_information_type const* init() noexcept {
+        static constexpr meta_information_type meta_information_instance  =
+                (((sizeof(Iter) <= SIZE) && (alignof(Iter) <= ALIGN) && (std::is_nothrow_move_constructible<Iter>())) ?
+                   meta_information_type(
+                         true,
+                         dereference_impl<Iter, true>,
+                         inc_impl<Iter, true>,
+                         destroy_impl<Iter, true>,
+                         copy_impl<Iter, true>,
+                         move_impl<Iter, true>,
+                         eq_impl<Iter, true>)
+                   : meta_information_type(
+                         false,
+                         dereference_impl<Iter, false>,
+                         inc_impl<Iter, false>,
+                         destroy_impl<Iter, false>,
+                         copy_impl<Iter, false>,
+                         move_impl<Iter, false>,
+                         eq_impl<Iter, false>)
+                     );
+        return &meta_information_instance;
+    }
+
+    static meta_information_type const* init_empty() noexcept {
+        static constexpr meta_information_type meta_information_instance = meta_information_type();
+        return &meta_information_instance;
+    }
+
+    template<typename Iter, bool is_small>
+    static constexpr T& dereference_impl(storage_type const &storage) {
+        if (is_small)
+            return *(reinterpret_cast<Iter const&>(storage));
+        else
+            return *(*(reinterpret_cast<Iter * const&>(storage)));
+    }
+
+    template<typename Iter, bool is_small>
+    static constexpr void inc_impl(storage_type &storage) {
+        if (is_small)
+            ++(reinterpret_cast<Iter&>(storage));
+        else
+            ++(*(reinterpret_cast<Iter*&>(storage)));
+    }
+
+    template<typename Iter, bool is_small>
+    static constexpr void destroy_impl(storage_type &storage) {
+        if (is_small)
+            reinterpret_cast<Iter&>(storage).Iter::~Iter();
+        else
+            delete reinterpret_cast<Iter*&>(storage);
+    }
+
+    template<typename Iter, bool is_small>
+    static constexpr void copy_impl(storage_type const &from, storage_type &to) {
+        if (is_small)
+            new(&to) Iter(reinterpret_cast<Iter const&>(from));
+        else
+            reinterpret_cast<Iter*&>(to) = new Iter(*reinterpret_cast<Iter const * const&>(from));
+    }
+
+    template<typename Iter, bool is_small>
+    static constexpr void move_impl(storage_type &from, storage_type &to) {
+        if (is_small) {
+            new (&to) Iter(std::move(reinterpret_cast<Iter&>(from)));
+        } else {
+            reinterpret_cast<Iter*&>(to) = new Iter(std::move(*reinterpret_cast<Iter*&>(from)));
+        }
+    }
+
+    template<typename Iter, bool is_small>
+    static constexpr bool eq_impl(storage_type const &a, storage_type const &b) {
+        if (is_small)
+            return reinterpret_cast<Iter const &>(a) == reinterpret_cast<Iter const &>(b);
+        else
+            return (reinterpret_cast<Iter const * const&>(a)) == (reinterpret_cast<Iter const * const&>(b));
+    }
+
+    static constexpr T& dereference_empty(storage_type const &) { throw bad_any_iterator("dereference empty any_iterator\n"); }
+
+    static constexpr void inc_empty(storage_type &) { throw bad_any_iterator("increment empty any_iterator\n"); }
+
+    static constexpr void destroy_empty(storage_type &) noexcept { }
+
+    static constexpr void copy_empty(storage_type const &, storage_type &) noexcept { }
+
+    static constexpr void move_empty(storage_type &, storage_type &) { }
+
+    static constexpr bool eq_empty(storage_type const &, storage_type const &) noexcept { return true; }
+};
 #endif // ANY_ITERATOR_H
