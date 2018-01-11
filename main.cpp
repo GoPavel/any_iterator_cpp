@@ -112,25 +112,28 @@ int main() {
     }
     {
         cout << "test 4" << endl;
-//        int const cnt = 0;
-//        std::vector<int> v;
-//        std::list<int> l;
-//        std::deque<int> q;
-//        for (int i = 0; i < cnt; ++i) {
-//            v.push_back(i);
-//            l.push_back(i);
-//            q.push_back(i);
-//        }
-//        Iter its[3];
-//        its[0] = v.begin();
-//        its[1] = l.begin();
-//        its[2] = q.begin();
-//        for (int i = 0; i < cnt; ++i) {
-//            for (int j = 0; j < 3; ++j) {
-//                assert(*its[j] == i);
-//                its[j]++;
-//            }
-//        }
+        int const cnt = 0;
+        std::vector<int> v;
+        std::list<int> l;
+        std::deque<int> q;
+        for (int i = 0; i < cnt; ++i) {
+            v.push_back(i);
+            l.push_back(i);
+            q.push_back(i);
+        }
+        Iter its[3];
+        its[0] = v.begin();
+        its[1] = l.begin();
+        its[2] = q.begin();
+        for (int i = 0; i < cnt; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                assert(*its[j] == i);
+                its[j]++;
+            }
+        }
     }
     return 0;
 }
+
+
+// TODO const iter ?
