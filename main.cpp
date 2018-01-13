@@ -24,17 +24,9 @@ bool small_info() {
              (std::is_nothrow_move_constructible<Iter>());
 }
 
-int main() {
-    {
-        cout << "iter small or not for int\n";
-        cout << "vector::iterator" << std::boolalpha << " "
-             << small_info<std::vector<int>::iterator, int>() << endl;
-        cout << "list::iterator" << std::boolalpha << " "
-             << small_info<std::list<int>::iterator, int>() << endl;
-        cout << "deque::iterator" << std::boolalpha << " "
-             << small_info<std::deque<int>::iterator, int>() << endl;
-    }
-    cout << "forward_test" << endl;
+template<typename Iter>
+void Test_Forward() {
+    cout << "Forward_iterator test" << endl;
     {
         cout << "test 1" << endl;
         std::vector<int> vec;
@@ -43,7 +35,7 @@ int main() {
         vec.push_back(3);
 
         std::vector<int>::iterator it = vec.begin();
-        IterF any_it(it);
+        Iter any_it(it);
         assert(*it == *any_it); // 1
         it++;
         any_it++;
@@ -70,7 +62,7 @@ int main() {
         it++;
         any_it++;
         assert(*it == *any_it); // end
-        IterF b;
+        Iter b;
         b = deq.begin();
 
     }
@@ -81,7 +73,7 @@ int main() {
             vec.push_back(i);
         }
         int j = 0;
-        for (IterF it = vec.begin(); it != IterF(vec.end()); ++it, ++j) {
+        for (Iter it = vec.begin(); it != vec.end(); ++it, ++j) {
             assert(j == *it);
         }
         {
@@ -90,7 +82,7 @@ int main() {
                 vec.push_back(i);
             }
             int j = 0;
-            for (IterF it = list.begin(); it != IterF(list.end()); ++it, ++j) {
+            for (IterF it = list.begin(); it != list.end(); ++it, ++j) {
                 assert(j == *it);
             }
         }
@@ -100,14 +92,14 @@ int main() {
         std::vector<int> vec;
         vec.push_back(666);
         vec.push_back(777);
-        IterF a;
+        Iter a;
         assert(a.empty());
         a = vec.begin();
         assert(!a.empty());
-        a = IterF();
+        a = Iter();
         assert(a.empty());
         a = vec.begin();
-        IterF b = a;
+        Iter b = a;
         b++;
         assert((*b) - (*a) == 111);
         swap(a, b);
@@ -143,7 +135,7 @@ int main() {
 //        --it;
 //    }
     {
-        cout << "test5" << endl;
+        cout << "test 5" << endl;
         int a[5] = {1, 2, 3, 4, 5};
         int *p = a;
         IterF it = p;
@@ -151,7 +143,14 @@ int main() {
             assert(*(it++) == i);
         }
     }
-    cout << "bidirect_test" << endl;
+    cout << endl;
+}
+
+template<typename Iter>
+void Test_Bidirect() {
+    cout << "Bidirect iterator test" << endl;
+    cout << "base: ";
+    Test_Forward<Iter>();
     {
         cout << "test1" << endl;
         std::vector<int> v;
@@ -159,7 +158,7 @@ int main() {
             v.push_back(i);
         }
         int i = 0;
-        for (IterB it = v.begin(); it != IterB(v.end()); ++it, ++i) {
+        for (Iter it = v.begin(); it != v.end(); ++it, ++i) {
             assert(*it == i);
         }
     }
@@ -170,42 +169,179 @@ int main() {
             v.push_back(i);
         }
         int i = 10;
-        for (IterB it = v.end(); it != IterB(v.begin());) {
+        for (Iter it = v.end(); it != Iter(v.begin());) {
+            --it;
+            --i;
+            assert(*it == i);
+        }
+    }
+   {
+        cout << "test3" << endl;
+        std::deque<int> deq;
+        for (int i = 0; i < 10; ++i) {
+            deq.push_back(i);
+        }
+        int i = 0;
+        for (Iter it = deq.begin(); it != deq.end(); it++, ++i) {
+            assert(*it == i);
+        }
+    }
+    {
+        cout << "test4" << endl;
+        std::deque<int> deq;
+        for (int i = 0; i < 10; ++i) {
+            deq.push_back(i);
+        }
+        int i = 10;
+        for (Iter it = deq.end(); it != deq.begin();) {
             --it;
             --i;
             assert(*it == i);
         }
     }
     {
-       {
-            cout << "test3" << endl;
-            std::deque<int> deq;
-//            for (int i = 0; i < 0; ++i) {
-//                deq.push_back(i);
-//            }
-//            int i = 0;
-            assert(deq.begin() == deq.end());
-            assert(IterB(deq.begin()) == IterB(deq.end()));
-//            for (IterF it = deq.begin(); it != IterF(deq.end()); it++, ++i) {
-//                assert(*it == i);
-//                cout << *it;
-//            }
+        cout << "test5" << endl;
+        std::deque<int> d;
+        std::vector<int> v;
+        for (int i = 0; i < 10; ++i) {
+            d.push_back(i);
+            v.push_back(i);
         }
-//        {
-//            cout << "test2" << endl;
-//            std::deque<int> deq;
-//            for (int i = 0; i < 10; ++i) {
-//                deq.push_back(i);
-//            }
-//            int i = 10;
-//            for (IterB it = deq.end(); it != IterB(deq.begin());) {
-//                --it;
-//                --i;
-//                assert(*it == i);
-//            }
-//        }
-
+        Iter a = d.begin();
+        Iter b = v.begin();
+        assert(!(a == b));
+        assert(a != b);
+        for(int i = 0; i < 10; ++i) {
+            assert(*a == *b);
+            ++a;
+            swap(a, b);
+            ++a;
+        }
     }
+    cout << "end Bidirect iterator test" << endl;;
+}
+
+template<typename Iter>
+void Test_Random() {
+    cout << "Random_iterator test" << endl;
+    cout << "base: ";
+    Test_Bidirect<any_iterator<int, std::random_access_iterator_tag>>();
+    {
+        cout << "test1" << endl;
+        std::vector<int> v;
+        for (int i = 0; i < 10; ++i) {
+            v.push_back(i);
+        }
+        Iter it = v.begin();
+        for (int i = 0; i < 10; ++i) {
+//            cout << it[i];
+            assert(it[i] == i);
+        }
+    }
+    {
+        cout << "test2" << endl;
+        std::vector<int> v;
+        for (int i = 0; i < 100; ++i) {
+            v.push_back(i);
+        }
+        Iter it = v.end();
+        int i = 100;
+        for (int j = 1; (i - j) >= 0; ++j) {
+            i -= j;
+            it -= j;
+            assert(i == it[0]);
+        }
+    }
+    {
+        cout << "test3" << endl;
+        std::deque<int> d;
+        for (int i = 0; i < 10; ++i) {
+            d.push_back(i);
+        }
+        Iter it = d.begin();
+        for (int i = 0; i < 10; ++i) {
+//            cout << it[i];
+            assert(it[i] == i);
+        }
+    }
+    {
+        cout << "test4" << endl;
+        std::deque<int> d;
+        for (int i = 0; i < 100; ++i) {
+            d.push_back(i);
+        }
+        Iter it = d.end();
+        int i = 100;
+        for (int j = 1; (i - j) >= 0; ++j) {
+            i -= j;
+            it -= j;
+            assert(i == it[0]);
+        }
+    }
+    {
+        cout << "test5" << endl;
+        std::vector<int> v;
+        std::deque<int> d;
+        for(int i = 0; i < 10; ++i) {
+            v.push_back(i);
+            d.push_back(i);
+        }
+        Iter a = v.begin();
+        Iter b = a;
+        assert(a <= b);
+        assert(b <= a);
+        assert(a <= a);
+        assert(b <= b);
+        ++b;
+        for(int i = 1; i < 10; ++i) {
+            assert(a < b);
+            assert(!(b < a));
+            ++b;
+        }
+    }
+    cout << "end Random_iterator test" << endl;
+}
+
+void usefull_info() {
+    cout << "Info: " << endl;
+    {
+        cout << "iter small or not for int\n";
+        cout << "vector::iterator" << std::boolalpha << " "
+             << small_info<std::vector<int>::iterator, int>() << endl;
+        cout << "list::iterator" << std::boolalpha << " "
+             << small_info<std::list<int>::iterator, int>() << endl;
+        cout << "deque::iterator" << std::boolalpha << " "
+             << small_info<std::deque<int>::iterator, int>() << endl;
+    }
+    cout << endl;
+}
+
+void Test_const() {
+    cout << "test const iterator" << endl;
+    typedef any_iterator<const int, std::forward_iterator_tag> const_iter;
+    std::vector<int> v;
+    for (int i = 0; i < 10; ++i) { v.push_back(i); }
+    cout << "end test const iterator" << endl;
+    int i = 0;
+    for (const_iter it = v.begin(); it != v.end(); ++it, ++i) {
+        assert(*it == i);
+    }
+    std::set<int> s;
+    for (int i = 0; i < 20; ++i) {
+        s.insert(i);
+    }
+    i = 0;
+    for (const_iter it = s.begin(); it != s.end(); ++it, ++i) {
+        assert(*it ==  i);
+//        cout << *it;
+    }
+}
+
+int main() {
+    Test_Forward<any_iterator<int, std::forward_iterator_tag>>();
+    Test_Bidirect<any_iterator<int, std::bidirectional_iterator_tag>>();
+    Test_Random<any_iterator<int, std::random_access_iterator_tag>>();
+    Test_const();
     return 0;
 }
 

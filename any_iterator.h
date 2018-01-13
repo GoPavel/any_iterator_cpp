@@ -1,9 +1,6 @@
-#ifndef ANY_ITERATOR_H
-#define ANY_ITERATOR_H
-
-#include <type_traits>
-#include <iterator>
 #include <cassert>
+#include <exception>
+#include <iterator>
 
 // Iterator must be
 /*
@@ -35,6 +32,8 @@ class any_iterator {
     typedef T value_type;
     typedef T* pointer;
     typedef T& reference;
+    typedef Iterator_category_tag iterator_category;
+    typedef std::ptrdiff_t difference_type;
 
     storage_type storage;
 
@@ -154,8 +153,7 @@ public: ///method
         std::swap(a.ops, b.ops);
     }
 
-//    template<typename = std::enable_if_t<std::is_base_of<std::bidirectional_iterator_tag, Iterator_category_tag>::value>>
-    any_iterator& operator--() noexcept {
+    any_iterator& operator--() {
         ops->dec(storage);
         return *this;
     }
@@ -181,8 +179,9 @@ public: ///method
 
 //    template<typename = std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iterator_category_tag>::value>>
     T& operator[](int32_t dist) {
-        ops->add(storage, dist);
-        return ops->dereference(storage);
+        any_iterator temp(*this);
+        temp += dist;
+        return *temp;
     }
 
 //    template<typename = std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iterator_category_tag>::value>>
@@ -211,6 +210,7 @@ public: ///method
         return a.ops->diff(a.storage,  b.storage);
     }
 };
+
 
 template <typename T>
 struct meta_information_type<T, std::forward_iterator_tag> {
@@ -427,6 +427,11 @@ struct meta_information_type<T, std::bidirectional_iterator_tag>
         return &meta_information_instance;
     }
 
+    static meta_information_type const* init_empty() noexcept {
+        static constexpr meta_information_type meta_information_instance = meta_information_type();
+        return &meta_information_instance;
+    }
+
     template<typename Iter, bool is_small>
     static constexpr void dec_impl(storage_type &data) {
         if (is_small)
@@ -452,13 +457,13 @@ struct meta_information_type<T, std::random_access_iterator_tag>
     using typename meta_information_type<T, std::forward_iterator_tag>::eq_type;
     using typename meta_information_type<T, std::bidirectional_iterator_tag>::dec_type;
 
-    using add_type = void(*)(storage_type &, int32_t);
+    using add_type = void(*)(storage_type &, int32_t const &);
     add_type add;
 
     using less_type = bool(*)(storage_type const&, storage_type const&);
     less_type less;
 
-    using diff_type = bool(*)(storage_type const&, storage_type const&);
+    using diff_type = std::ptrdiff_t(*)(storage_type const&, storage_type const&);
     diff_type diff;
 
     constexpr meta_information_type(bool is_small,
@@ -498,7 +503,7 @@ struct meta_information_type<T, std::random_access_iterator_tag>
     static meta_information_type const *init() noexcept {
         static constexpr meta_information_type meta_information_instance  =
                 (((sizeof(Iter) <= SIZE) && (alignof(Iter) <= ALIGN) && (std::is_nothrow_move_constructible<Iter>())) ?
-                   meta_infomation_type(
+                   meta_information_type(
                          true,
                          meta_information_type<T, std::forward_iterator_tag>::template copy_constr_impl<Iter, true>,
                          meta_information_type<T, std::forward_iterator_tag>::template move_constr_impl<Iter, true>,
@@ -526,8 +531,13 @@ struct meta_information_type<T, std::random_access_iterator_tag>
         return &meta_information_instance;
     }
 
+    static meta_information_type const* init_empty() noexcept {
+        static constexpr meta_information_type meta_information_instance = meta_information_type();
+        return &meta_information_instance;
+    }
+
     template<typename Iter, bool is_small>
-    static constexpr void add_impl(storage_type &data, int32_t dist) {
+    static constexpr void add_impl(storage_type &data, int32_t const &dist) {
         if(is_small)
             (reinterpret_cast<Iter &>(data)) += dist;
         else {
@@ -539,16 +549,16 @@ struct meta_information_type<T, std::random_access_iterator_tag>
     template<typename Iter, bool is_small>
     static constexpr bool less_impl(storage_type const &a, storage_type const &b) {
         if(is_small)
-            return (reinterpret_cast<Iter&>(a)) < (reinterpret_cast<Iter&>(b));
+            return (reinterpret_cast<Iter const&>(a)) < (reinterpret_cast<Iter const&>(b));
         else
-            return (reinterpret_cast<Iter *&>(a)) < (reinterpret_cast<Iter *&>(b));
+            return (*reinterpret_cast<Iter const * const&>(a)) < (*reinterpret_cast<Iter const* const&>(b));
 
     }
 
     template<typename Iter, bool is_small>
     static constexpr std::ptrdiff_t diff_impl(storage_type const &a, storage_type const &b) {
         if (is_small)
-            return reinterpret_cast<Iter &>(a) - reinterpret_cast<Iter &>(b);
+            return reinterpret_cast<Iter const&>(a) - reinterpret_cast<Iter const&>(b);
         else {
             assert(reinterpret_cast<Iter const * const&>(a) != nullptr);
             assert(reinterpret_cast<Iter const * const&>(b) != nullptr);
@@ -556,11 +566,9 @@ struct meta_information_type<T, std::random_access_iterator_tag>
         }
     }
 
-    static constexpr void add_empty(storage_type &, int32_t) { throw bad_any_iterator("increment empty any iterator\n"); }
+    static constexpr void add_empty(storage_type &, int32_t const&) { throw bad_any_iterator("increment empty any iterator\n"); }
 
     static constexpr bool less_empty(storage_type const &, storage_type const &) { throw bad_any_iterator("less for empty any iterator\n"); }
 
-    static constexpr bool diff_empty(storage_type const &, storage_type const &) {throw bad_any_iterator("diff for empty any iterator]n"); }
+    static constexpr std::ptrdiff_t diff_empty(storage_type const &, storage_type const &) {throw bad_any_iterator("diff for empty any iterator]n"); }
 };
-
-#endif // ANY_ITERATOR_H
