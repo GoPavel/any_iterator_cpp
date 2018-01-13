@@ -8,11 +8,7 @@
 #include <deque>
 #include <typeinfo>
 
-//template class any_iterator<int, std::forward_iterator_tag>;
-
-typedef any_iterator<int, std::forward_iterator_tag> IterF;
-typedef any_iterator<int, std::bidirectional_iterator_tag> IterB;
-typedef any_iterator<int, std::random_access_iterator_tag> IterR;
+template class any_iterator<int, std::forward_iterator_tag>;
 
 using std::endl;
 using std::cout;
@@ -54,7 +50,7 @@ void Test_Forward() {
         deq.push_back(2);
 
         std::deque<int>::iterator it = deq.begin();
-        IterF any_it(it);
+        Iter any_it(it);
         assert(*it == *any_it); // 1
         it++;
         any_it++;
@@ -81,10 +77,10 @@ void Test_Forward() {
             for(int i = 0; i < 10; ++i) {
                 vec.push_back(i);
             }
-            int j = 0;
-            for (IterF it = list.begin(); it != list.end(); ++it, ++j) {
-                assert(j == *it);
-            }
+//            int j = 0;
+//            for (Iter it = list.begin(); it != Ilist.end(); ++it, ++j) {
+//                assert(j == *it);
+//            }
         }
     }
     {
@@ -116,7 +112,7 @@ void Test_Forward() {
             l.push_back(i);
             q.push_back(i);
         }
-        IterF its[3];
+        Iter its[3];
         its[0] = v.begin();
         its[1] = l.begin();
         its[2] = q.begin();
@@ -138,7 +134,7 @@ void Test_Forward() {
         cout << "test 5" << endl;
         int a[5] = {1, 2, 3, 4, 5};
         int *p = a;
-        IterF it = p;
+        Iter it = p;
         for (int i = 1; i < 6; ++i) {
             assert(*(it++) == i);
         }
@@ -149,8 +145,8 @@ void Test_Forward() {
 template<typename Iter>
 void Test_Bidirect() {
     cout << "Bidirect iterator test" << endl;
-    cout << "base: ";
-    Test_Forward<Iter>();
+//    cout << "base: ";
+//    Test_Forward<Iter>();
     {
         cout << "test1" << endl;
         std::vector<int> v;
@@ -224,8 +220,8 @@ void Test_Bidirect() {
 template<typename Iter>
 void Test_Random() {
     cout << "Random_iterator test" << endl;
-    cout << "base: ";
-    Test_Bidirect<any_iterator<int, std::random_access_iterator_tag>>();
+//    cout << "base: ";
+//    Test_Bidirect<any_iterator<int, std::random_access_iterator_tag>>();
     {
         cout << "test1" << endl;
         std::vector<int> v;

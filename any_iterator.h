@@ -11,6 +11,22 @@
  * lvalue swappable
  */
 
+template<typename T, typename Iterator_tag>
+class base_any_iterator {
+
+};
+
+template<typename T, typename Iterator_category_tag>
+class any_iterator;
+
+template<typename T>
+class base_any_iterator<T, std::random_access_iterator_tag> {
+public:
+    T& operator[](int32_t dist) {
+        return *(static_cast<any_iterator<T, std::random_access_iterator_tag>&>(*this) + dist);
+    }
+};
+
 class bad_any_iterator: public std::exception {
 public:
     char const* message;
@@ -30,7 +46,7 @@ template<typename T, typename Iterator_category_tag>
 struct meta_information_type;
 
 template<typename T, typename Iterator_category_tag>
-class any_iterator {
+class any_iterator: public base_any_iterator<T, Iterator_category_tag> {
     typedef T value_type;
     typedef T* pointer;
     typedef T& reference;
@@ -92,9 +108,8 @@ public: ///method
 
     constexpr any_iterator& operator= (any_iterator const& other) {
         if ((*this) != other) {
-            ops->destroy(storage);
-            ops = other.ops;
-            ops->copy_constr(other.storage, storage);
+            any_iterator temp = other;
+            swap(*this, temp);
         }
         return *this;
     }
@@ -120,16 +135,13 @@ public: ///method
         return ops->is_empty;
     }
 
-    constexpr any_iterator& operator++() {
-        ops->inc(storage);
-        return *this;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if<std::is_base_of<std::forward_iterator_tag, B>::value, any_iterator<A, B>&>::type
+    operator++(any_iterator<A, B>&);
 
-    constexpr any_iterator operator++(int) {
-        any_iterator temp(*this);
-        ops->inc(storage);
-        return temp;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if<std::is_base_of<std::forward_iterator_tag, B>::value, any_iterator<A, B>>::type
+    operator++(any_iterator<A, B>&, int);
 
     constexpr T* operator-> () const{
         return &ops->dereference(storage);
@@ -155,72 +167,166 @@ public: ///method
         std::swap(a.ops, b.ops);
     }
 
-    constexpr any_iterator& operator--() {
-        ops->dec(storage);
-        return *this;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::bidirectional_iterator_tag, B>::value, any_iterator<A, B>&>
+    operator--(any_iterator<A, B>&);
 
-    constexpr any_iterator operator--(int) {
-        any_iterator temp(*this);
-        ops->dec(storage);
-        return temp;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::bidirectional_iterator_tag, B>::value, any_iterator<A, B>>
+    operator--(any_iterator<A, B>&, int);
 
-    any_iterator& operator+=(int32_t dist) {
-        ops->add(storage, dist);
-        return *this;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value, any_iterator<A, B>&>
+    operator+=(any_iterator<A, B>&, int32_t dist);
 
-    any_iterator& operator-=(int32_t dist) {
-        ops->add(storage, -dist);
-        return *this;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value, any_iterator<A, B>&>
+    operator-=(any_iterator<A, B>&, int32_t dist);
 
-    constexpr  T& operator[](int32_t dist) {
-        any_iterator temp(*this);
-        temp += dist;
-        return *temp;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value, any_iterator<A, B>>
+    operator+(any_iterator<A, B> const &a, int32_t n);
 
-    friend any_iterator operator+(any_iterator const &a, int32_t n) {
-        return any_iterator(a) += n;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value, any_iterator<A, B>>
+    operator+(int32_t n, any_iterator const &a);
 
-    friend any_iterator operator+(int32_t n, any_iterator const &a) {
-        return any_iterator(a) += n;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value, any_iterator<A, B>>
+    operator-(any_iterator const &a, int32_t n);
 
-    friend any_iterator operator-(any_iterator const &a, int32_t n) {
-        return any_iterator(a) -= n;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value, any_iterator<A, B>>
+    operator-(int32_t n, any_iterator const &a);
 
-    friend any_iterator operator-(int32_t n, any_iterator const &a) {
-        return any_iterator(a) -= n;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value,  bool>
+    operator<(any_iterator<A, B> const &a, any_iterator<A, B> const &b);
 
-    friend bool operator< (any_iterator const &a, any_iterator const &b) {
-        assert(a.ops == b.ops);
-        return a.ops->less(a.storage, b.storage);
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value,  bool>
+    operator>(any_iterator<A, B> const &a, any_iterator<A, B> const &b);
 
-    friend bool operator>(any_iterator const &a, any_iterator const &b) {
-        return b < a;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value,  bool>
+    operator>=(any_iterator<A, B> const &a, any_iterator<A, B> const &b);
 
-    friend bool operator>=(any_iterator const &a, any_iterator const &b) {
-        return a > b || a == b;
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value,  bool>
+    operator<=(any_iterator<A, B> const &a, any_iterator<A, B> const &b);
 
-    friend bool operator<=(any_iterator const &a, any_iterator const &b) {
-        return a < b || a == b;
-    }
-
-    friend std::ptrdiff_t operator- (any_iterator const &a, any_iterator const &b) {
-        assert(a.ops == b.ops);
-        return a.ops->diff(a.storage,  b.storage);
-    }
+    template<typename A, typename B>
+    friend typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, B>::value,  std::ptrdiff_t>
+    operator- (any_iterator const &a, any_iterator const &b);
 };
 
+template<typename T, typename Iter>
+typename std::enable_if<std::is_base_of<std::forward_iterator_tag, Iter>::value, any_iterator<T, Iter>&>::type
+operator++(any_iterator<T, Iter> & it) {
+    it.ops->inc(it.storage);
+    return it;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if<std::is_base_of<std::forward_iterator_tag, Iter>::value, any_iterator<T, Iter>>::type
+operator++(any_iterator<T, Iter> &it, int) {
+       any_iterator<T, Iter> temp(it);
+       it.ops->inc(it.storage);
+       return temp;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::bidirectional_iterator_tag, Iter>::value, any_iterator<T, Iter>&>
+operator--(any_iterator<T, Iter> &it) {
+    it.ops->dec(it.storage);
+    return it;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::bidirectional_iterator_tag, Iter>::value, any_iterator<T, Iter>>
+operator--(any_iterator<T, Iter> &it, int) {
+    any_iterator<T, Iter> temp(it);
+    it.ops->dec(it.storage);
+    return temp;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, any_iterator<T, Iter>&>
+operator+=(any_iterator<T, Iter> &it, int32_t dist) {
+    it.ops->add(it.storage, dist);
+    return it;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, any_iterator<T, Iter>&>
+operator-=(any_iterator<T, Iter> &it, int32_t dist) {
+    it.ops->add(it.storage, -dist);
+    return it;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, any_iterator<T, Iter>>
+operator+(any_iterator<T, Iter> const &a, int32_t n) {
+    any_iterator<T, Iter> temp(a);
+    temp += n;
+    return temp;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, any_iterator<T, Iter>>
+operator+(int32_t n, any_iterator<T, Iter> const &a) {
+    any_iterator<T, Iter> temp(a);
+    temp += n;
+    return temp;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, any_iterator<T, Iter>>
+operator-(any_iterator<T, Iter> const &a, int32_t n) {
+    any_iterator<T, Iter> temp(a);
+    temp -= n;
+    return temp;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, any_iterator<T, Iter>>
+operator-(int32_t n, any_iterator<T, Iter> const &a) {
+    any_iterator<T, Iter> temp(a);
+    temp -= n;
+    return temp;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, bool>
+operator<(any_iterator<T, Iter> const &a, any_iterator<T, Iter> const &b) {
+    assert(a.ops == b.ops);
+    return a.ops->less(a.storage, b.storage);
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, bool>
+operator>(any_iterator<T, Iter> const &a, any_iterator<T, Iter> const &b) {
+    return b < a;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, bool>
+operator>=(any_iterator<T, Iter> const &a, any_iterator<T, Iter> const &b) {
+    return a > b || a == b;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, bool>
+operator<=(any_iterator<T, Iter> const &a, any_iterator<T, Iter> const &b) {
+    return a < b || a == b;
+}
+
+template<typename T, typename Iter>
+typename std::enable_if_t<std::is_base_of<std::random_access_iterator_tag, Iter>::value, std::ptrdiff_t>
+operator-(any_iterator<T, Iter> const &a, any_iterator<T, Iter> const &b) {
+    assert(a.ops == b.ops);
+    return a.ops->diff(a.storage,  b.storage);
+}
 
 template <typename T>
 struct meta_information_type<T, std::forward_iterator_tag> {
