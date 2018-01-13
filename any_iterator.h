@@ -159,7 +159,7 @@ public: ///method
     }
 
 //    template<typename = std::enable_if_t<std::is_base_of<std::bidirectional_iterator_tag, Iterator_category_tag>::value>>
-    any_iterator operator--(int) noexcept {
+    any_iterator operator--(int) {
         any_iterator temp(*this);
         ops->dec(storage);
         return temp;
@@ -572,3 +572,14 @@ struct meta_information_type<T, std::random_access_iterator_tag>
 
     static constexpr std::ptrdiff_t diff_empty(storage_type const &, storage_type const &) {throw bad_any_iterator("diff for empty any iterator]n"); }
 };
+
+template <typename T>
+using any_forward_iterator<T> = any_iterator<T, std::forward_iterator_tag>;
+
+template <typename T>
+using any_bidirectional_iterator<T> = any_iterator<T, std::bidirectional_iterator_tag>;
+
+template <typename T>
+using any_random_access_iterator<T> = any_iterator<T, std::random_access_iterator_tag>;
+
+#endif
