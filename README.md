@@ -1,5 +1,5 @@
 # any_iterator_cpp
-Implementation type erasure on C++ for interator.
+Implementation type erasure on C++ for iterator.
 
 Point of implementation:
 - save alignment
