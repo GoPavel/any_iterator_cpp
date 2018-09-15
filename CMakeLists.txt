@@ -4,9 +4,13 @@ project(any_iterator)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -Wall -Wextra -std=c++14 -fsanitize=address,undefined -fno-sanitize-recover -fstack-protector")
 
-add_executable(${PROJECT_NAME}
-                               any_iterator.h
-                               main.cpp)
+add_executable(test
+                     any_iterator.h
+                     main.cpp)
+
+add_executable(example
+                    any_iterator.h
+                    example.cpp)
 
 # useful stuff:
 # ------------------------------------------------------------s
